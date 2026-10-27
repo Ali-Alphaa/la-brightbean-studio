@@ -1,0 +1,43 @@
+{% extends "growth/_layout.html" %}
+
+{% block growth_content %}
+{% include "growth/_account_picker.html" %}
+{% if account %}
+<div class="grid gap-5 lg:grid-cols-2">
+    <div class="g-card p-5">
+        <h3 class="text-[15px] font-semibold text-stone-900 mb-1">Suggest hashtags for a caption</h3>
+        <p class="g-help mb-3">Based on the hashtags that did best on {{ account.account_name }}{% if ai_enabled %}, plus AI ideas{% endif %}.</p>
+        <form method="post" hx-post="{% url 'growth:hashtags' workspace_id=workspace.id %}" hx-target="#hashtag-suggestions" hx-swap="innerHTML" class="space-y-3">
+            {% csrf_token %}
+            <input type="hidden" name="account" value="{{ account.id }}">
+            <textarea name="caption" rows="5" class="g-input" placeholder="Paste or write your caption…" required>{{ caption }}</textarea>
+            {% if ai_enabled %}<label class="flex items-center gap-2 text-[13px] text-stone-600"><input type="checkbox" name="use_ai" checked> Include AI ideas</label>{% endif %}
+            <button class="g-btn" type="submit">Suggest hashtags</button>
+        </form>
+        <div id="hashtag-suggestions" class="mt-4">{% include "growth/_hashtag_suggestions.html" %}</div>
+    </div>
+
+    <div class="g-card p-5">
+        <h3 class="text-[15px] font-semibold text-stone-900 mb-1">Your hashtags, ranked</h3>
+        <p class="g-help mb-3">Hashtags used at least twice in the last 6 months ({{ scored_count }} measured posts). 1.0× = a typical post.</p>
+        {% if best %}
+        <table class="g-table">
+            <thead><tr><th>Hashtag</th><th class="g-num">Uses</th><th class="g-num">Performance</th></tr></thead>
+            <tbody>
+            {% for h in best %}
+            <tr><td class="font-semibold text-stone-800">#{{ h.tag }}</td><td class="g-num">{{ h.uses }}</td>
+                <td class="g-num"><span class="g-pill {% if h.lift >= 1 %}good{% else %}bad{% endif %}">{{ h.lift }}×</span></td></tr>
+            {% endfor %}
+            </tbody>
+        </table>
+        {% if worst %}
+        <p class="text-[13px] font-semibold text-stone-700 mt-5 mb-1">Consider dropping</p>
+        <p class="text-[13px] text-stone-600">{% for h in worst %}<span class="g-pill bad mr-1 mb-1">#{{ h.tag }} {{ h.lift }}×</span>{% endfor %}</p>
+        {% endif %}
+        {% else %}
+        <p class="text-sm text-stone-500">No hashtag has been used twice on measured posts yet.</p>
+        {% endif %}
+    </div>
+</div>
+{% endif %}
+{% endblock %}

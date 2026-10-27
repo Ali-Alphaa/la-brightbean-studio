@@ -1,0 +1,62 @@
+{% extends "growth/_layout.html" %}
+
+{% block growth_content %}
+{% include "growth/_account_picker.html" %}
+{% if result %}
+<div class="grid gap-5 lg:grid-cols-3">
+    <div class="g-card p-5 lg:col-span-2">
+        <div class="flex items-baseline justify-between mb-3">
+            <h3 class="text-[15px] font-semibold text-stone-900">When your posts do best</h3>
+            <span class="g-help">{{ workspace.effective_timezone|default:"UTC" }} · {{ result.scored_posts }} measured post{{ result.scored_posts|pluralize }}, last 6 months</span>
+        </div>
+        <div class="overflow-x-auto">
+            <table class="text-[10px]" style="border-collapse: separate; border-spacing: 2px;">
+                <thead><tr><th></th>{% for h in hours %}<th class="font-medium text-stone-400 px-0.5">{% if h|divisibleby:3 %}{{ h }}{% endif %}</th>{% endfor %}</tr></thead>
+                <tbody>
+                {% for day, cells in heat_rows %}
+                    <tr>
+                        <th class="pr-2 text-right font-semibold text-stone-500">{{ day }}</th>
+                        {% for cell in cells %}
+                            {% if cell %}
+                            <td title="{{ day }} {{ forloop.counter0 }}:00 · {{ cell.posts }} post{{ cell.posts|pluralize }} · {{ cell.lift }}× a typical post"
+                                style="width:18px;height:18px;border-radius:4px;background:{% if cell.alpha %}rgba(234,88,12,{{ cell.alpha|stringformat:".2f" }}){% else %}var(--neutral-200){% endif %};"></td>
+                            {% else %}
+                            <td style="width:18px;height:18px;border-radius:4px;background:var(--neutral-50);"></td>
+                            {% endif %}
+                        {% endfor %}
+                    </tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        <p class="g-help mt-3">Darker = posts published in that hour did better than this account's typical post. Grey = below typical. Empty = no posts yet.</p>
+    </div>
+
+    <div class="g-card p-5">
+        <h3 class="text-[15px] font-semibold text-stone-900 mb-1">Recommended slots</h3>
+        {% if result.source == "default" %}
+        <p class="g-help mb-3">Not enough history yet ({{ result.scored_posts }} of {{ min_posts }} measured posts), so these are common good defaults. They'll personalise as you publish.</p>
+        {% else %}
+        <p class="g-help mb-3">Ranked by how much better posts in that hour did than your typical post.</p>
+        {% endif %}
+        <ol class="space-y-1.5 mb-4">
+            {% for slot in result.top %}
+            <li class="flex items-center justify-between text-[13px]">
+                <span class="font-semibold text-stone-800">{{ slot.label }}</span>
+                {% if slot.posts %}<span class="g-pill good">{{ slot.lift }}× · {{ slot.posts }} post{{ slot.posts|pluralize }}</span>{% else %}<span class="g-pill">default</span>{% endif %}
+            </li>
+            {% endfor %}
+        </ol>
+        <form method="post" action="{% url 'growth:apply_best_times' workspace_id=workspace.id %}" class="space-y-3 pt-3 border-t border-stone-100">
+            {% csrf_token %}
+            <input type="hidden" name="account" value="{{ account.id }}">
+            <label class="g-label" for="count">Add the top</label>
+            <select id="count" name="count" class="g-input">{% for n in "1234567"|make_list %}<option value="{{ n }}" {% if n == "5" %}selected{% endif %}>{{ n }} slot{{ n|pluralize }}</option>{% endfor %}</select>
+            <label class="flex items-center gap-2 text-[13px] text-stone-600"><input type="checkbox" name="replace"> Turn off my other posting slots</label>
+            <button class="g-btn" type="submit">Use as posting slots</button>
+            <p class="g-help">Queues fill these slots automatically.</p>
+        </form>
+    </div>
+</div>
+{% endif %}
+{% endblock %}

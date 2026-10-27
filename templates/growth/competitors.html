@@ -1,0 +1,80 @@
+{% extends "growth/_layout.html" %}
+
+{% block growth_content %}
+<div class="grid gap-5 lg:grid-cols-3 mb-5">
+    <div class="g-card p-5">
+        <h3 class="text-[15px] font-semibold text-stone-900 mb-1">Track an account</h3>
+        <p class="g-help mb-3">Public accounts on Bluesky and Mastodon — no login needed. Synced twice a day.</p>
+        <form method="post" class="space-y-3">
+            {% csrf_token %}
+            <select name="platform" class="g-input">{% for value, label in platforms %}<option value="{{ value }}">{{ label }}</option>{% endfor %}</select>
+            <input name="handle" class="g-input" placeholder="name.bsky.social or @name@mastodon.social" required maxlength="255">
+            <button class="g-btn" type="submit">Track</button>
+        </form>
+    </div>
+    <div class="g-card p-5 lg:col-span-2">
+        <h3 class="text-[15px] font-semibold text-stone-900 mb-3">Tracked accounts</h3>
+        {% if rows %}
+        <div class="overflow-x-auto">
+        <table class="g-table">
+            <thead><tr><th>Account</th><th class="g-num">Followers</th><th class="g-num">7 days</th><th class="g-num">30 days</th><th class="g-num">Posts</th><th></th></tr></thead>
+            <tbody>
+            {% for row in rows %}{% with c=row.competitor %}
+            <tr>
+                <td>
+                    <a href="{{ c.profile_url }}" target="_blank" rel="noopener" class="font-semibold text-stone-800 hover:underline">{{ c.display_name|default:c.handle }}</a>
+                    <div class="g-help">{{ c.get_platform_display }} · {{ c.handle }}{% if c.last_error %} · <span class="text-red-600">{{ c.last_error }}</span>{% endif %}</div>
+                </td>
+                <td class="g-num">{{ c.followers }}</td>
+                <td class="g-num">{% if row.delta_7 is not None %}<span class="g-pill {% if row.delta_7 > 0 %}good{% elif row.delta_7 < 0 %}bad{% endif %}">{{ row.delta_7|stringformat:"+d" }}</span>{% else %}—{% endif %}</td>
+                <td class="g-num">{% if row.delta_30 is not None %}<span class="g-pill {% if row.delta_30 > 0 %}good{% elif row.delta_30 < 0 %}bad{% endif %}">{{ row.delta_30|stringformat:"+d" }}</span>{% else %}—{% endif %}</td>
+                <td class="g-num">{{ c.posts_count }}</td>
+                <td class="whitespace-nowrap text-right">
+                    <form method="post" action="{% url 'growth:competitor_refresh' workspace_id=workspace.id competitor_id=c.id %}" class="inline">{% csrf_token %}<button class="g-btn-ghost" type="submit">Refresh</button></form>
+                    <form method="post" action="{% url 'growth:competitor_delete' workspace_id=workspace.id competitor_id=c.id %}" class="inline">{% csrf_token %}<button class="g-btn-ghost" type="submit">Remove</button></form>
+                </td>
+            </tr>
+            {% endwith %}{% endfor %}
+            </tbody>
+        </table>
+        </div>
+        <p class="g-help mt-2">Growth figures appear once tracking has run for 7 or 30 days.</p>
+        {% else %}
+        <p class="text-sm text-stone-500">Nothing tracked yet.</p>
+        {% endif %}
+    </div>
+</div>
+
+<div class="g-card p-5">
+    <div class="flex flex-wrap items-baseline justify-between gap-2 mb-1">
+        <h3 class="text-[15px] font-semibold text-stone-900">Inspiration: their best recent posts</h3>
+        <div class="flex gap-1">
+            <a class="g-pill {% if days == 7 %}good{% endif %}" href="?days=7">7 days</a>
+            <a class="g-pill {% if days == 30 %}good{% endif %}" href="?days=30">30 days</a>
+            <a class="g-pill {% if days == 90 %}good{% endif %}" href="?days=90">90 days</a>
+        </div>
+    </div>
+    <p class="g-help mb-3">Ranked by likes + replies + reposts. Save one to your idea board to write your own take.</p>
+    {% if inspiration %}
+    <div class="grid gap-3 md:grid-cols-2">
+        {% for p in inspiration %}
+        <div class="border border-stone-200 rounded-xl p-4 flex flex-col gap-2">
+            <div class="flex items-center justify-between g-help"><span class="font-semibold text-stone-700">{{ p.competitor.display_name|default:p.competitor.handle }}</span><span>{{ p.published_at|date:"M j" }}</span></div>
+            <div class="text-[13px] text-stone-800 g-clamp" style="-webkit-line-clamp:6">{{ p.text }}</div>
+            <div class="flex flex-wrap items-center gap-2 mt-auto">
+                <span class="g-pill">♥ {{ p.likes }}</span><span class="g-pill">↩ {{ p.replies }}</span><span class="g-pill">⟳ {{ p.reposts }}</span>
+                {% if p.url %}<a class="g-help hover:underline" href="{{ p.url }}" target="_blank" rel="noopener">View</a>{% endif %}
+                <form method="post" action="{% url 'growth:inspiration_to_idea' workspace_id=workspace.id post_id=p.id %}" class="ml-auto flex items-center gap-2">
+                    {% csrf_token %}
+                    {% if ai_enabled %}<label class="g-help flex items-center gap-1"><input type="checkbox" name="rewrite"> AI rewrite</label>{% endif %}
+                    <button class="g-btn-ghost" type="submit">Save as idea</button>
+                </form>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+    {% else %}
+    <p class="text-sm text-stone-500">Track some accounts to fill this feed.</p>
+    {% endif %}
+</div>
+{% endblock %}

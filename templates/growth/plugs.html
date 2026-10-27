@@ -1,0 +1,46 @@
+{% extends "growth/_layout.html" %}
+
+{% block growth_content %}
+<div class="g-card p-5 mb-5 flex flex-wrap items-center justify-between gap-3">
+    <div>
+        <h3 class="text-[15px] font-semibold text-stone-900">Default plug is {% if settings.autoplug_enabled %}<span class="text-green-700">on</span>{% else %}off{% endif %}</h3>
+        <p class="g-help">{% if settings.autoplug_enabled %}Every new post gets “{{ settings.autoplug_text|truncatechars:80 }}” as a comment after {{ settings.autoplug_threshold }} engagements.{% else %}A plug is a comment with your link, posted only once a post takes off.{% endif %}</p>
+    </div>
+    <a class="g-btn-ghost" href="{% url 'growth:settings' workspace_id=workspace.id %}">Default plug settings</a>
+</div>
+
+<div class="grid gap-5 lg:grid-cols-2">
+    <div class="g-card p-5">
+        <h3 class="text-[15px] font-semibold text-stone-900 mb-1">Add a plug to a recent post</h3>
+        <p class="g-help mb-3">Posts published in the last 7 days. Works where the network allows comments through its API.</p>
+        {% if recent %}
+        <form method="post" class="space-y-3">
+            {% csrf_token %}
+            <select name="platform_post" class="g-input">{% for pp in recent %}<option value="{{ pp.id }}">{{ pp.social_account.account_name }} · {{ pp.published_at|date:"M j" }} · {{ pp.post.caption_snippet|truncatechars:60 }}</option>{% endfor %}</select>
+            <textarea name="text" rows="3" class="g-input" placeholder="Enjoyed this? I share more in my newsletter: https://…" required maxlength="2000"></textarea>
+            <div><label class="g-label" for="threshold">Post after this many engagements</label><input id="threshold" type="number" min="0" name="threshold" class="g-input" value="{{ settings.autoplug_threshold }}"></div>
+            <button class="g-btn" type="submit">Save plug</button>
+        </form>
+        {% else %}
+        <p class="text-sm text-stone-500">Nothing published in the last 7 days.</p>
+        {% endif %}
+    </div>
+
+    <div class="g-card p-5">
+        <h3 class="text-[15px] font-semibold text-stone-900 mb-3">Plugs</h3>
+        {% for plug in plugs %}
+        <div class="py-2.5 border-t border-stone-100 first:border-t-0 text-[13px]">
+            <div class="flex items-center justify-between gap-2">
+                <span class="text-stone-800 font-semibold">{{ plug.platform_post.social_account.account_name }} · {{ plug.platform_post.published_at|date:"M j" }}</span>
+                <span class="g-pill {% if plug.status == 'posted' %}good{% elif plug.status == 'failed' %}bad{% endif %}">{{ plug.get_status_display }}{% if plug.status == 'pending' %} · {{ plug.last_engagements|floatformat:0 }}/{{ plug.threshold }}{% endif %}</span>
+            </div>
+            <div class="g-help g-clamp">{{ plug.text }}</div>
+            {% if plug.error %}<div class="text-[12px] text-red-600">{{ plug.error }}</div>{% endif %}
+            {% if plug.status == 'pending' %}<form method="post" action="{% url 'growth:plug_delete' workspace_id=workspace.id plug_id=plug.id %}">{% csrf_token %}<button class="g-help hover:underline" type="submit">Remove</button></form>{% endif %}
+        </div>
+        {% empty %}
+        <p class="text-sm text-stone-500">No plugs yet.</p>
+        {% endfor %}
+    </div>
+</div>
+{% endblock %}

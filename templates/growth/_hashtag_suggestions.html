@@ -1,0 +1,14 @@
+{% if history_suggestions is not None %}
+    {% if history_suggestions %}
+    <p class="text-[13px] font-semibold text-stone-700 mb-1">From your best posts</p>
+    <p class="mb-3">{% for h in history_suggestions %}<span class="g-pill good mr-1 mb-1" title="{{ h.uses }} uses">#{{ h.tag }} · {{ h.lift }}×</span>{% endfor %}</p>
+    {% else %}
+    <p class="g-help mb-3">No proven hashtags to add yet — keep posting and this gets sharper.</p>
+    {% endif %}
+{% endif %}
+{% if ai_suggestions %}
+<p class="text-[13px] font-semibold text-stone-700 mb-1">AI ideas</p>
+<p>{% for tag in ai_suggestions %}<span class="g-pill mr-1 mb-1">#{{ tag }}</span>{% endfor %}</p>
+<p class="g-help">AI ideas are untested on your audience — try them and check back here.</p>
+{% endif %}
+{% if ai_error %}<p class="text-[13px] text-red-600">{{ ai_error }}</p>{% endif %}

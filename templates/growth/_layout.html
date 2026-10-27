@@ -1,0 +1,47 @@
+{% extends "base.html" %}
+
+{% block title %}Growth — {{ workspace.name }} — Brightbean{% endblock %}
+
+{% block extra_head %}
+<style>
+    .g-card { background: #fff; border: 1px solid var(--border); border-radius: var(--radius-xl); box-shadow: var(--shadow-xs); }
+    .g-tabs { display: flex; gap: 4px; overflow-x: auto; border-bottom: 1px solid var(--border); margin-bottom: 20px; }
+    .g-tabs a { padding: 8px 14px; font-size: 0.8125rem; font-weight: 600; color: var(--text-tertiary); border-bottom: 2px solid transparent; white-space: nowrap; text-decoration: none; }
+    .g-tabs a.active { color: var(--neutral-900); border-bottom-color: var(--primary); }
+    .g-table { width: 100%; border-collapse: collapse; font-size: 0.8125rem; }
+    .g-table th { padding: 8px 10px; text-align: left; font-weight: 600; color: var(--text-tertiary); font-size: 0.6875rem; text-transform: uppercase; letter-spacing: 0.05em; white-space: nowrap; }
+    .g-table td { padding: 8px 10px; border-top: 1px solid var(--neutral-100); vertical-align: top; color: var(--text-secondary); }
+    .g-num { font-family: var(--font-mono); text-align: right; white-space: nowrap; }
+    .g-pill { display: inline-flex; align-items: center; gap: 4px; border-radius: var(--radius-full); font-size: 11px; font-weight: 600; padding: 2px 8px; background: var(--neutral-100); color: var(--text-secondary); }
+    .g-pill.good { color: var(--success-700); background: var(--success-50); }
+    .g-pill.bad { color: var(--error-700); background: var(--error-50); }
+    .g-btn { display: inline-flex; align-items: center; gap: 6px; padding: 7px 16px; font-size: 13px; font-weight: 600; color: #fff; border-radius: var(--radius-full); background: var(--primary); box-shadow: var(--shadow-primary); cursor: pointer; border: none; }
+    .g-btn-ghost { display: inline-flex; align-items: center; gap: 6px; padding: 6px 14px; font-size: 12px; font-weight: 600; color: var(--text-secondary); border-radius: var(--radius-full); background: #fff; border: 1px solid var(--border); cursor: pointer; }
+    .g-input { width: 100%; padding: 8px 12px; font-size: 14px; border: 1px solid var(--border); border-radius: var(--radius-lg); outline: none; background: #fff; }
+    .g-label { display: block; font-size: 13px; font-weight: 600; color: var(--text-secondary); margin-bottom: 6px; }
+    .g-help { font-size: 12px; color: var(--text-tertiary); margin-top: 4px; }
+    .g-clamp { display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; white-space: pre-line; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="max-w-6xl">
+    <div class="mb-4">
+        <h2 class="text-xl font-semibold text-stone-900 tracking-tight">Growth</h2>
+        <p class="text-sm text-stone-500 mt-0.5">Find what works for your audience and do more of it.</p>
+    </div>
+
+    <nav class="g-tabs" aria-label="Growth sections">
+        <a href="{% url 'growth:best_times' workspace_id=workspace.id %}" class="{% if tab == 'best_times' %}active{% endif %}">Best times</a>
+        <a href="{% url 'growth:hashtags' workspace_id=workspace.id %}" class="{% if tab == 'hashtags' %}active{% endif %}">Hashtags</a>
+        <a href="{% url 'growth:top_posts' workspace_id=workspace.id %}" class="{% if tab == 'top_posts' %}active{% endif %}">Top posts &amp; recycling</a>
+        <a href="{% url 'growth:experiments' workspace_id=workspace.id %}" class="{% if tab == 'experiments' %}active{% endif %}">A/B tests</a>
+        <a href="{% url 'growth:competitors' workspace_id=workspace.id %}" class="{% if tab == 'competitors' %}active{% endif %}">Competitors &amp; inspiration</a>
+        <a href="{% url 'growth:plugs' workspace_id=workspace.id %}" class="{% if tab == 'plugs' %}active{% endif %}">Auto-plugs</a>
+        <a href="{% url 'growth:audience' workspace_id=workspace.id %}" class="{% if tab == 'audience' %}active{% endif %}">Top engagers</a>
+        <a href="{% url 'growth:settings' workspace_id=workspace.id %}" class="{% if tab == 'settings' %}active{% endif %}">Settings</a>
+    </nav>
+
+    {% block growth_content %}{% endblock %}
+</div>
+{% endblock %}

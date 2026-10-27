@@ -1,0 +1,13 @@
+{% if accounts %}
+<form method="get" class="flex items-center gap-2 mb-5" x-data>
+    <label for="account-picker" class="text-[13px] font-semibold text-stone-600">Account</label>
+    <select id="account-picker" name="account" class="g-input" style="width:auto" @change="$el.closest('form').requestSubmit()">
+        {% for a in accounts %}
+        <option value="{{ a.id }}" {% if account and a.id == account.id %}selected{% endif %}>{{ a.account_name }} · {{ a.get_platform_display }}</option>
+        {% endfor %}
+    </select>
+    <noscript><button class="g-btn-ghost" type="submit">Show</button></noscript>
+</form>
+{% else %}
+<div class="g-card p-6 text-sm text-stone-600">Connect a channel first — growth insights are built from your published posts and their analytics.</div>
+{% endif %}

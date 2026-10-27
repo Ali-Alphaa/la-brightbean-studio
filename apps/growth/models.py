@@ -1,0 +1,241 @@
+"""Growth-marketing features layered on top of publishing and analytics.
+
+Nothing here changes how a post is published unless a workspace opts in:
+UTM tagging, recycling and default auto-plugs are all off by default.
+"""
+
+from __future__ import annotations
+
+import uuid
+
+from django.conf import settings
+from django.db import models
+
+
+class GrowthSettings(models.Model):
+    """Per-workspace switches for the automated growth features."""
+
+    workspace = models.OneToOneField(
+        "workspaces.Workspace",
+        on_delete=models.CASCADE,
+        related_name="growth_settings",
+    )
+
+    # UTM tagging, applied to links at publish time.
+    utm_enabled = models.BooleanField(default=False)
+    # ``{platform}`` is replaced with the account's platform key (e.g. "linkedin_company").
+    utm_source = models.CharField(max_length=100, default="{platform}")
+    utm_medium = models.CharField(max_length=100, default="social")
+    utm_campaign = models.CharField(max_length=100, blank=True, default="")
+
+    # Evergreen recycling of top performers.
+    recycle_enabled = models.BooleanField(default=False)
+    recycle_min_age_days = models.PositiveIntegerField(default=30)
+    recycle_gap_days = models.PositiveIntegerField(
+        default=60, help_text="Minimum days before the same post is recycled again."
+    )
+    recycle_per_week = models.PositiveIntegerField(default=2)
+    recycle_top_percent = models.PositiveIntegerField(
+        default=20, help_text="Only posts in this top percentage of their account are recycled."
+    )
+    recycle_auto_schedule = models.BooleanField(
+        default=False, help_text="Schedule copies into the next free slot instead of leaving them as drafts."
+    )
+    recycle_ai_rewrite = models.BooleanField(default=False)
+    recycle_last_run_at = models.DateTimeField(null=True, blank=True)
+
+    # Default auto-plug attached to every newly published post.
+    autoplug_enabled = models.BooleanField(default=False)
+    autoplug_text = models.TextField(blank=True, default="")
+    autoplug_threshold = models.PositiveIntegerField(default=20, help_text="Engagements before the plug is posted.")
+    # Only posts published after the default plug was switched on get it.
+    autoplug_enabled_at = models.DateTimeField(null=True, blank=True)
+
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = "growth_settings"
+
+    def __str__(self) -> str:
+        return f"GrowthSettings({self.workspace_id})"
+
+    @classmethod
+    def for_workspace(cls, workspace) -> GrowthSettings:
+        obj, _ = cls.objects.get_or_create(workspace=workspace)
+        return obj
+
+
+class RecycledPost(models.Model):
+    """One recycle: ``new_post`` is a copy of ``source_post``."""
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    workspace = models.ForeignKey("workspaces.Workspace", on_delete=models.CASCADE, related_name="recycled_posts")
+    source_post = models.ForeignKey("composer.Post", on_delete=models.CASCADE, related_name="recycles")
+    new_post = models.OneToOneField(
+        "composer.Post", on_delete=models.SET_NULL, null=True, blank=True, related_name="recycled_from"
+    )
+    source_score = models.FloatField(default=0.0)
+    automatic = models.BooleanField(default=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        db_table = "growth_recycled_post"
+        ordering = ["-created_at"]
+        indexes = [models.Index(fields=["workspace", "created_at"])]
+
+
+class AutoPlug(models.Model):
+    """Comment posted on a live post once it crosses an engagement threshold."""
+
+    class Status(models.TextChoices):
+        PENDING = "pending", "Waiting for threshold"
+        POSTED = "posted", "Posted"
+        FAILED = "failed", "Failed"
+        EXPIRED = "expired", "Expired"
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    platform_post = models.OneToOneField("composer.PlatformPost", on_delete=models.CASCADE, related_name="auto_plug")
+    text = models.TextField()
+    threshold = models.PositiveIntegerField(default=20)
+    status = models.CharField(max_length=10, choices=Status.choices, default=Status.PENDING, db_index=True)
+    comment_id = models.CharField(max_length=255, blank=True, default="")
+    error = models.TextField(blank=True, default="")
+    last_engagements = models.FloatField(default=0.0)
+    posted_at = models.DateTimeField(null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        db_table = "growth_auto_plug"
+        ordering = ["-created_at"]
+
+
+class Competitor(models.Model):
+    """A public account the workspace tracks (not connected, read-only)."""
+
+    class Platform(models.TextChoices):
+        BLUESKY = "bluesky", "Bluesky"
+        MASTODON = "mastodon", "Mastodon"
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    workspace = models.ForeignKey("workspaces.Workspace", on_delete=models.CASCADE, related_name="competitors")
+    platform = models.CharField(max_length=20, choices=Platform.choices)
+    handle = models.CharField(max_length=255)
+    display_name = models.CharField(max_length=255, blank=True, default="")
+    avatar_url = models.URLField(max_length=500, blank=True, default="")
+    profile_url = models.URLField(max_length=500, blank=True, default="")
+    followers = models.PositiveIntegerField(default=0)
+    posts_count = models.PositiveIntegerField(default=0)
+    last_synced_at = models.DateTimeField(null=True, blank=True)
+    last_error = models.TextField(blank=True, default="")
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        db_table = "growth_competitor"
+        ordering = ["display_name", "handle"]
+        constraints = [
+            models.UniqueConstraint(fields=["workspace", "platform", "handle"], name="growth_competitor_unique")
+        ]
+
+    def __str__(self) -> str:
+        return f"{self.platform}:{self.handle}"
+
+
+class CompetitorSnapshot(models.Model):
+    """Daily follower/post totals, for growth deltas."""
+
+    competitor = models.ForeignKey(Competitor, on_delete=models.CASCADE, related_name="snapshots")
+    date = models.DateField()
+    followers = models.PositiveIntegerField(default=0)
+    posts_count = models.PositiveIntegerField(default=0)
+
+    class Meta:
+        db_table = "growth_competitor_snapshot"
+        ordering = ["date"]
+        constraints = [models.UniqueConstraint(fields=["competitor", "date"], name="growth_competitor_snapshot_unique")]
+
+
+class CompetitorPost(models.Model):
+    """A recent public post by a competitor; the inspiration library."""
+
+    competitor = models.ForeignKey(Competitor, on_delete=models.CASCADE, related_name="posts")
+    external_id = models.CharField(max_length=255)
+    url = models.URLField(max_length=500, blank=True, default="")
+    text = models.TextField(blank=True, default="")
+    published_at = models.DateTimeField(db_index=True)
+    likes = models.PositiveIntegerField(default=0)
+    replies = models.PositiveIntegerField(default=0)
+    reposts = models.PositiveIntegerField(default=0)
+    engagements = models.PositiveIntegerField(default=0, db_index=True)
+    captured_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = "growth_competitor_post"
+        ordering = ["-engagements"]
+        constraints = [
+            models.UniqueConstraint(fields=["competitor", "external_id"], name="growth_competitor_post_unique")
+        ]
+
+
+class CaptionExperiment(models.Model):
+    """A/B test: the same idea published with different captions at different times."""
+
+    class Status(models.TextChoices):
+        RUNNING = "running", "Running"
+        COMPLETED = "completed", "Completed"
+        CANCELLED = "cancelled", "Cancelled"
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    workspace = models.ForeignKey("workspaces.Workspace", on_delete=models.CASCADE, related_name="caption_experiments")
+    social_account = models.ForeignKey(
+        "social_accounts.SocialAccount", on_delete=models.CASCADE, related_name="caption_experiments"
+    )
+    name = models.CharField(max_length=200)
+    status = models.CharField(max_length=10, choices=Status.choices, default=Status.RUNNING, db_index=True)
+    evaluate_after_hours = models.PositiveIntegerField(default=48)
+    winner = models.ForeignKey(
+        "growth.CaptionVariant", on_delete=models.SET_NULL, null=True, blank=True, related_name="+"
+    )
+    created_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    evaluated_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        db_table = "growth_caption_experiment"
+        ordering = ["-created_at"]
+
+
+class CaptionVariant(models.Model):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    experiment = models.ForeignKey(CaptionExperiment, on_delete=models.CASCADE, related_name="variants")
+    label = models.CharField(max_length=4)
+    caption = models.TextField()
+    post = models.ForeignKey("composer.Post", on_delete=models.SET_NULL, null=True, blank=True, related_name="+")
+    score = models.FloatField(null=True, blank=True)
+    score_basis = models.CharField(max_length=30, blank=True, default="")
+    metrics = models.JSONField(default=dict, blank=True)
+
+    class Meta:
+        db_table = "growth_caption_variant"
+        ordering = ["label"]
+
+
+class AudienceContact(models.Model):
+    """CRM notes on a person who engages with the workspace's accounts.
+
+    Engagement counts are computed from the inbox on read; this row only holds
+    what the team adds (tags, notes), so it exists only once someone edits it.
+    """
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    workspace = models.ForeignKey("workspaces.Workspace", on_delete=models.CASCADE, related_name="audience_contacts")
+    platform = models.CharField(max_length=30)
+    handle = models.CharField(max_length=255)
+    tags = models.JSONField(default=list, blank=True)
+    notes = models.TextField(blank=True, default="")
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = "growth_audience_contact"
+        constraints = [
+            models.UniqueConstraint(fields=["workspace", "platform", "handle"], name="growth_contact_unique")
+        ]
