@@ -1,0 +1,47 @@
+{% extends "growth/_layout.html" %}
+
+{% block growth_content %}
+<a href="{% url 'growth:experiments' workspace_id=workspace.id %}" class="g-help hover:underline">← All tests</a>
+<div class="g-card p-5 mt-2">
+    <div class="flex flex-wrap items-start justify-between gap-3 mb-4">
+        <div>
+            <h3 class="text-[17px] font-semibold text-stone-900">{{ experiment.name }}</h3>
+            <p class="g-help">{{ experiment.social_account.account_name }} · results {{ experiment.evaluate_after_hours }}h after the last variant is published</p>
+        </div>
+        {% if experiment.status == "running" %}
+        <form method="post" class="flex gap-2">
+            {% csrf_token %}
+            <button class="g-btn-ghost" name="action" value="evaluate" type="submit">Calculate results now</button>
+            <button class="g-btn-ghost" name="action" value="cancel" type="submit">Cancel test</button>
+        </form>
+        {% endif %}
+    </div>
+
+    {% if experiment.status == "completed" %}
+    <div class="rounded-xl p-4 mb-4 {% if experiment.winner %}bg-green-50 text-green-800{% else %}bg-stone-50 text-stone-700{% endif %} text-[13px]">
+        {% if experiment.winner %}<strong>Variant {{ experiment.winner.label }} won.</strong> Use its style more — and run another test to confirm, since one test can be swayed by timing or news.
+        {% else %}<strong>No clear winner</strong> — the variants were within 10% of each other.{% endif %}
+    </div>
+    {% elif progress.due_at %}
+    <p class="text-[13px] text-stone-600 mb-4">All variants are live. Results on {{ progress.due_at|date:"M j, H:i" }}.</p>
+    {% elif experiment.status == "running" %}
+    <p class="text-[13px] text-stone-600 mb-4">Waiting for every variant to be published.</p>
+    {% endif %}
+
+    <div class="overflow-x-auto">
+    <table class="g-table">
+        <thead><tr><th></th><th>Caption</th><th>Status</th><th class="g-num">Score</th></tr></thead>
+        <tbody>
+        {% for row in progress.rows %}{% with v=row.variant %}
+        <tr>
+            <td class="font-semibold text-stone-800">{{ v.label }}{% if experiment.winner_id == v.id %} 🏆{% endif %}</td>
+            <td style="max-width:460px"><div class="g-clamp text-stone-800">{{ v.caption }}</div></td>
+            <td class="whitespace-nowrap">{{ row.status }}{% if row.platform_post.published_at %}<div class="g-help">{{ row.platform_post.published_at|date:"M j, H:i" }}</div>{% elif row.platform_post.scheduled_at %}<div class="g-help">{{ row.platform_post.scheduled_at|date:"M j, H:i" }}</div>{% endif %}</td>
+            <td class="g-num">{% if v.score is not None %}{{ v.score|floatformat:2 }}{% if v.score_basis == "engagement_rate" %}%{% endif %}<div class="g-help">{% if v.score_basis == "engagement_rate" %}engagement rate{% else %}engagements{% endif %}</div>{% else %}—{% endif %}</td>
+        </tr>
+        {% endwith %}{% endfor %}
+        </tbody>
+    </table>
+    </div>
+</div>
+{% endblock %}

@@ -1,0 +1,56 @@
+{% extends "growth/_layout.html" %}
+
+{% block growth_content %}
+<div class="grid gap-5 lg:grid-cols-5">
+    <div class="g-card p-5 lg:col-span-3">
+        <h3 class="text-[15px] font-semibold text-stone-900 mb-1">New caption test</h3>
+        <p class="g-help mb-4">Each caption is published as its own post on the same account, spaced apart. After the results window, the variant with the best engagement rate (or engagements, where the network doesn't report views) wins.</p>
+        {% if accounts %}
+        <form method="post" class="space-y-4">
+            {% csrf_token %}
+            <div class="grid gap-3 sm:grid-cols-2">
+                <div><label class="g-label" for="name">Test name</label><input id="name" name="name" class="g-input" value="{{ form.name }}" placeholder="Question vs statement hook" maxlength="200"></div>
+                <div><label class="g-label" for="account">Account</label>
+                    <select id="account" name="account" class="g-input">{% for a in accounts %}<option value="{{ a.id }}" {% if form.account == a.id|stringformat:"s" %}selected{% endif %}>{{ a.account_name }} · {{ a.get_platform_display }}</option>{% endfor %}</select></div>
+            </div>
+            {% for caption in form.captions %}
+            <div><label class="g-label">Caption {% cycle 'A' 'B' 'C' 'D' %}</label><textarea name="caption" rows="3" class="g-input">{{ caption }}</textarea></div>
+            {% endfor %}
+            {% if form.captions|length < max_variants %}
+            <div><label class="g-label">Caption {% if form.captions|length == 2 %}C{% else %}D{% endif %} <span class="font-normal text-stone-400">(optional)</span></label><textarea name="caption" rows="3" class="g-input"></textarea></div>
+            {% endif %}
+            <div class="grid gap-3 sm:grid-cols-3">
+                <div><label class="g-label" for="start_at">First post</label><input id="start_at" type="datetime-local" name="start_at" class="g-input" value="{{ form.start_at }}"><p class="g-help">{{ workspace.effective_timezone|default:"UTC" }}</p></div>
+                <div><label class="g-label" for="spacing_hours">Hours between variants</label><input id="spacing_hours" type="number" min="1" name="spacing_hours" class="g-input" value="{{ form.spacing_hours }}"><p class="g-help">Same weekday &amp; hour a week apart (168) is the fairest.</p></div>
+                <div><label class="g-label" for="evaluate_after_hours">Results after (hours)</label><input id="evaluate_after_hours" type="number" min="12" name="evaluate_after_hours" class="g-input" value="{{ form.evaluate_after_hours }}"></div>
+            </div>
+            <label class="flex items-center gap-2 text-[13px] text-stone-600"><input type="checkbox" name="as_drafts"> Create as drafts (for approval) instead of scheduling</label>
+            <div class="flex flex-wrap gap-2">
+                <button class="g-btn" type="submit" name="action" value="create">Create test</button>
+                {% if ai_enabled %}<button class="g-btn-ghost" type="submit" name="action" value="generate">✨ Generate variants from caption A</button>{% endif %}
+            </div>
+        </form>
+        {% else %}
+        <p class="text-sm text-stone-500">Connect a channel to run tests.</p>
+        {% endif %}
+    </div>
+
+    <div class="g-card p-5 lg:col-span-2">
+        <h3 class="text-[15px] font-semibold text-stone-900 mb-3">Tests</h3>
+        {% for row in experiment_rows %}{% with e=row.experiment %}
+        <a href="{% url 'growth:experiment_detail' workspace_id=workspace.id experiment_id=e.id %}" class="block py-2.5 border-t border-stone-100 first:border-t-0 hover:bg-stone-50 -mx-2 px-2 rounded-lg">
+            <div class="flex items-center justify-between gap-2">
+                <span class="font-semibold text-[13px] text-stone-800">{{ e.name }}</span>
+                {% if e.status == "completed" %}<span class="g-pill good">{% if e.winner %}{{ e.winner.label }} won{% else %}no clear winner{% endif %}</span>
+                {% elif e.status == "cancelled" %}<span class="g-pill">cancelled</span>
+                {% elif row.progress.due_at %}<span class="g-pill">results {{ row.progress.due_at|date:"M j, H:i" }}</span>
+                {% else %}<span class="g-pill">running</span>{% endif %}
+            </div>
+            <div class="g-help">{{ e.social_account.account_name }} · {{ e.variants.count }} variants · {{ e.created_at|date:"M j" }}</div>
+        </a>
+        {% endwith %}{% empty %}
+        <p class="text-sm text-stone-500">No tests yet.</p>
+        {% endfor %}
+    </div>
+</div>
+{% endblock %}

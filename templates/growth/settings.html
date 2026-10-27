@@ -1,0 +1,47 @@
+{% extends "growth/_layout.html" %}
+
+{% block growth_content %}
+<form method="post" class="max-w-2xl space-y-5">
+    {% csrf_token %}
+    <div class="g-card p-5 space-y-4">
+        <label class="flex items-start gap-3">
+            <input type="checkbox" name="utm_enabled" class="mt-1" {% if settings.utm_enabled %}checked{% endif %}>
+            <span><span class="text-[14px] font-semibold text-stone-800">Add UTM tags to links</span>
+            <span class="block g-help">Links in captions, first comments and plugs get <code>utm_*</code> parameters when published, so your web analytics shows which network and campaign sent each visit. Your saved captions aren't changed, and existing UTM parameters are never overwritten.</span></span>
+        </label>
+        <div class="grid gap-3 sm:grid-cols-3">
+            <div><label class="g-label" for="utm_source">utm_source</label><input id="utm_source" name="utm_source" class="g-input" value="{{ settings.utm_source }}" maxlength="100"><p class="g-help"><code>{platform}</code> = network name</p></div>
+            <div><label class="g-label" for="utm_medium">utm_medium</label><input id="utm_medium" name="utm_medium" class="g-input" value="{{ settings.utm_medium }}" maxlength="100"></div>
+            <div><label class="g-label" for="utm_campaign">utm_campaign</label><input id="utm_campaign" name="utm_campaign" class="g-input" value="{{ settings.utm_campaign }}" maxlength="100" placeholder="optional"></div>
+        </div>
+    </div>
+
+    <div class="g-card p-5 space-y-4">
+        <label class="flex items-start gap-3">
+            <input type="checkbox" name="recycle_enabled" class="mt-1" {% if settings.recycle_enabled %}checked{% endif %}>
+            <span><span class="text-[14px] font-semibold text-stone-800">Recycle top posts automatically</span>
+            <span class="block g-help">Once a day at most, copies one of your best older posts (up to the weekly limit).</span></span>
+        </label>
+        <div class="grid gap-3 sm:grid-cols-2">
+            <div><label class="g-label" for="recycle_top_percent">Only posts in the top (%)</label><input id="recycle_top_percent" type="number" min="1" max="100" name="recycle_top_percent" class="g-input" value="{{ settings.recycle_top_percent }}"></div>
+            <div><label class="g-label" for="recycle_per_week">Posts per week</label><input id="recycle_per_week" type="number" min="1" max="7" name="recycle_per_week" class="g-input" value="{{ settings.recycle_per_week }}"></div>
+            <div><label class="g-label" for="recycle_min_age_days">Minimum age (days)</label><input id="recycle_min_age_days" type="number" min="1" name="recycle_min_age_days" class="g-input" value="{{ settings.recycle_min_age_days }}"></div>
+            <div><label class="g-label" for="recycle_gap_days">Don't repeat within (days)</label><input id="recycle_gap_days" type="number" min="1" name="recycle_gap_days" class="g-input" value="{{ settings.recycle_gap_days }}"></div>
+        </div>
+        <label class="flex items-center gap-2 text-[13px] text-stone-700"><input type="checkbox" name="recycle_auto_schedule" {% if settings.recycle_auto_schedule %}checked{% endif %}> Schedule into the next free posting slot (otherwise drafts for review)</label>
+        <label class="flex items-center gap-2 text-[13px] text-stone-700 {% if not ai_enabled %}opacity-50{% endif %}"><input type="checkbox" name="recycle_ai_rewrite" {% if settings.recycle_ai_rewrite %}checked{% endif %} {% if not ai_enabled %}disabled{% endif %}> Refresh the wording with AI {% if not ai_enabled %}(set GROWTH_AI_API_KEY to enable){% endif %}</label>
+    </div>
+
+    <div class="g-card p-5 space-y-4">
+        <label class="flex items-start gap-3">
+            <input type="checkbox" name="autoplug_enabled" class="mt-1" {% if settings.autoplug_enabled %}checked{% endif %}>
+            <span><span class="text-[14px] font-semibold text-stone-800">Default auto-plug</span>
+            <span class="block g-help">Comments this on every post published from now on, once it passes the threshold, within 7 days. Not available on networks without comment APIs (TikTok, Pinterest, Google Business).</span></span>
+        </label>
+        <textarea name="autoplug_text" rows="3" class="g-input" maxlength="2000" placeholder="If you liked this, my newsletter goes deeper: https://…">{{ settings.autoplug_text }}</textarea>
+        <div><label class="g-label" for="autoplug_threshold">Engagements before posting</label><input id="autoplug_threshold" type="number" min="0" name="autoplug_threshold" class="g-input" style="max-width:160px" value="{{ settings.autoplug_threshold }}"></div>
+    </div>
+
+    <button class="g-btn" type="submit">Save settings</button>
+</form>
+{% endblock %}

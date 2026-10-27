@@ -36,6 +36,7 @@ from apps.common.worker import SHUTDOWN_REQUESTED
 from apps.composer.models import PlatformPost
 from apps.composer.services import publish_blocker, usable_media_types
 from apps.credentials.models import resolve_platform_credentials
+from apps.growth.services.utm import tag_for_platform_post
 from apps.media_library.storage import download_to_path
 from apps.social_accounts.error_messages import (
     FIRST_COMMENT_GENERIC_MESSAGE,
@@ -871,17 +872,19 @@ class PublishEngine:
                 first_media_type=first_media_type,
             )
 
+            # UTM tagging is opt-in per workspace and never raises.
+            caption = tag_for_platform_post(platform_post.effective_caption, platform_post)
             content = PublishContent(
-                text=platform_post.effective_caption or "",
+                text=caption or "",
                 title=platform_post.effective_title,
-                description=platform_post.effective_caption,
-                first_comment=platform_post.effective_first_comment,
+                description=caption,
+                first_comment=tag_for_platform_post(platform_post.effective_first_comment, platform_post),
                 media_files=media_files,
                 media_urls=media_urls,
                 media_types=media_types,
                 post_type=post_type,
                 extra=extra,
-                link_url=link_url,
+                link_url=tag_for_platform_post(link_url, platform_post),
                 video_duration_sec=primary_video_duration,
                 # Stable per PlatformPost, so every retry of this row sends the
                 # same key; a clone or a new post is a new row and a new key.
@@ -1608,7 +1611,7 @@ def _post_first_comment_task(platform_post_id):
         logger.info("First comment for PlatformPost %s already posted; skipping.", platform_post.id)
         return
 
-    comment_text = platform_post.effective_first_comment
+    comment_text = tag_for_platform_post(platform_post.effective_first_comment, platform_post)
     if not comment_text:
         return
 

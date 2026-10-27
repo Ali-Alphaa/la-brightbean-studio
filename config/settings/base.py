@@ -76,6 +76,7 @@ LOCAL_APPS = [
     "apps.mcp",
     "apps.oauth_server",
     "apps.analytics",
+    "apps.growth",
     "theme",
 ]
 
@@ -336,6 +337,13 @@ GOOGLE_AUTH_CLIENT_SECRET = env("GOOGLE_AUTH_CLIENT_SECRET", default="")
 
 # Unsplash stock-photo search in the composer (optional; empty disables the feature)
 UNSPLASH_ACCESS_KEY = env("UNSPLASH_ACCESS_KEY", default="")
+
+# Growth AI — optional; any OpenAI-compatible chat-completions endpoint. Powers
+# AI hashtag ideas, caption variants for A/B tests and rewrites of recycled
+# posts. Everything else in the Growth section works without it.
+GROWTH_AI_API_KEY = env("GROWTH_AI_API_KEY", default="") or env("OPENAI_API_KEY", default="")
+GROWTH_AI_BASE_URL = env("GROWTH_AI_BASE_URL", default="https://api.openai.com/v1")
+GROWTH_AI_MODEL = env("GROWTH_AI_MODEL", default="gpt-4o-mini")
 
 SOCIALACCOUNT_PROVIDERS = {
     "google": {

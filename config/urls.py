@@ -32,6 +32,7 @@ urlpatterns = [
     path("workspace/<uuid:workspace_id>/calendar/", include("apps.calendar.urls")),
     path("workspace/<uuid:workspace_id>/inbox/", include("apps.inbox.urls")),
     path("workspace/<uuid:workspace_id>/analytics/", include("apps.analytics.urls")),
+    path("workspace/<uuid:workspace_id>/growth/", include("apps.growth.urls")),
     path("webhooks/", include("apps.inbox.webhook_urls")),
     path("webhooks/", include("apps.common.webhook_urls")),
     # Agent API (Phase 2) — programmatic access for external AI agents.
