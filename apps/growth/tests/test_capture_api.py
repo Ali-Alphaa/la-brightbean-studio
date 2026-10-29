@@ -105,7 +105,7 @@ def test_capture_contract_and_counts(workspace, issue, _no_tagging_queue):
     body = {
         "platform": "instagram",
         "ownHandle": "me",
-        "utcOffset": 60,
+        "utcOffset": -60,
         "items": items(("a", 40), ("b", 50), ("c", 60), ("viral", 600), ("saved", None, {"manual": True})),
     }
     response = post(token, body)

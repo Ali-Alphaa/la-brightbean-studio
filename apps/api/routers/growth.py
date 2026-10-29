@@ -230,7 +230,7 @@ class CaptureItemIn(Schema):
 class CaptureIn(Schema):
     platform: Literal["instagram", "tiktok"]
     ownHandle: str | None = Field(None, max_length=255)  # noqa: N815
-    utcOffset: int | None = Field(None, ge=-14 * 60, le=14 * 60)  # noqa: N815 — minutes east of UTC
+    utcOffset: int | None = Field(None, ge=-14 * 60, le=14 * 60)  # noqa: N815 — JS getTimezoneOffset(): minutes west of UTC
     items: list[CaptureItemIn] = Field(..., max_length=100)
 
 
@@ -281,5 +281,5 @@ def inspiration_capture(request, payload: CaptureIn):
     return {
         "saved": result.saved,
         "manual": result.manual,
-        "savedToday": inspiration.saved_today(workspace, payload.utcOffset),
+        "savedToday": inspiration.saved_today(workspace, -payload.utcOffset if payload.utcOffset is not None else None),
     }
