@@ -51,6 +51,11 @@ mcp>=1.0,<2.0
 django-oauth-toolkit>=3.0,<4.0
 
 
+# Claude (Anthropic) for the Growth AI features — optional at runtime, only
+# called when ANTHROPIC_API_KEY is set. 2.x is the release with messages.parse
+# (Pydantic structured outputs), output_config.effort and server-side fallbacks.
+anthropic>=2.3,<3.0
+
 # Dev/Test
 ruff>=0.6,<1.0
 mypy>=1.11,<1.20

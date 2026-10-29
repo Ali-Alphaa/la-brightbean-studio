@@ -623,6 +623,30 @@ class InboxSyncEngine:
             obj.save(update_fields=["sentiment"])
             if notify:
                 self._notify_new_message(obj)
+            if account.platform in ("instagram", "instagram_login") and msg.message_type == "comment":
+                self._run_comment_dm_rules(account, msg)
+
+    @staticmethod
+    def _run_comment_dm_rules(account, msg):
+        """Growth → Comment → DM for comments the poll found first (webhook missed or off).
+
+        Idempotent with the webhook path: a comment is logged — and answered — once.
+        """
+        try:
+            from apps.growth.services.comment_dm import handle_instagram_comment
+
+            extra = msg.extra or {}
+            handle_instagram_comment(
+                account,
+                comment_id=str(msg.platform_message_id),
+                text=msg.text or "",
+                commenter_id=str(msg.sender_id or ""),
+                commenter_handle=str(extra.get("sender_handle") or msg.sender_name or ""),
+                media_id=str(extra.get("stored_post_id") or extra.get("post_id") or ""),
+                commented_at=msg.timestamp,
+            )
+        except Exception:
+            logger.exception("Comment → DM rules failed for account %s", account.id)
 
     def _notify_new_message(self, message):
         """Send notification for a new inbox message."""

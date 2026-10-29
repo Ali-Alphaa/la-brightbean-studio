@@ -20,6 +20,7 @@
     .g-input { width: 100%; padding: 8px 12px; font-size: 14px; border: 1px solid var(--border); border-radius: var(--radius-lg); outline: none; background: #fff; }
     .g-label { display: block; font-size: 13px; font-weight: 600; color: var(--text-secondary); margin-bottom: 6px; }
     .g-help { font-size: 12px; color: var(--text-tertiary); margin-top: 4px; }
+    .g-card-muted { background: var(--neutral-50, #fafaf9); border: 1px dashed var(--border); border-radius: var(--radius-xl); }
     .g-clamp { display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; white-space: pre-line; }
 </style>
 {% endblock %}
@@ -37,6 +38,9 @@
         <a href="{% url 'growth:top_posts' workspace_id=workspace.id %}" class="{% if tab == 'top_posts' %}active{% endif %}">Top posts &amp; recycling</a>
         <a href="{% url 'growth:experiments' workspace_id=workspace.id %}" class="{% if tab == 'experiments' %}active{% endif %}">A/B tests</a>
         <a href="{% url 'growth:competitors' workspace_id=workspace.id %}" class="{% if tab == 'competitors' %}active{% endif %}">Competitors &amp; inspiration</a>
+        <a href="{% url 'growth:inspiration' workspace_id=workspace.id %}" class="{% if tab == 'inspiration' %}active{% endif %}">Inspiration</a>
+        <a href="{% url 'growth:voices' workspace_id=workspace.id %}" class="{% if tab == 'voices' %}active{% endif %}">Voices</a>
+        <a href="{% url 'growth:comment_dm' workspace_id=workspace.id %}" class="{% if tab == 'comment_dm' %}active{% endif %}">Comment → DM</a>
         <a href="{% url 'growth:plugs' workspace_id=workspace.id %}" class="{% if tab == 'plugs' %}active{% endif %}">Auto-plugs</a>
         <a href="{% url 'growth:audience' workspace_id=workspace.id %}" class="{% if tab == 'audience' %}active{% endif %}">Top engagers</a>
         <a href="{% url 'growth:settings' workspace_id=workspace.id %}" class="{% if tab == 'settings' %}active{% endif %}">Settings</a>

@@ -68,3 +68,50 @@ def _recycle():
             run_recycling(growth_settings.workspace, growth_settings)
         except Exception:
             logger.exception("Recycling for workspace %s failed", growth_settings.workspace_id)
+
+
+@background(schedule=0)
+def tag_inspiration(workspace_id: str):
+    """Tag newly captured inspiration posts with Claude (queued after a capture)."""
+    from apps.growth.services import ai
+    from apps.growth.services.inspiration import analyze_pending
+    from apps.workspaces.models import Workspace
+
+    workspace = Workspace.objects.filter(id=workspace_id).first()
+    if workspace is None or not ai.is_enabled():
+        return
+    try:
+        analyze_pending(workspace)
+    except ai.AIUnavailableError as exc:
+        logger.info("Inspiration tagging for workspace %s skipped: %s", workspace_id, exc)
+    except Exception:
+        logger.exception("Inspiration tagging for workspace %s failed", workspace_id)
+
+
+def queue_tagging(workspace) -> None:
+    """Queue :func:`tag_inspiration` unless one is already waiting for this workspace."""
+    from background_task.models import Task
+
+    try:
+        if Task.objects.filter(
+            task_name="apps.growth.tasks.tag_inspiration", task_params__contains=str(workspace.id)
+        ).exists():
+            return
+        tag_inspiration(str(workspace.id))
+    except Exception:
+        logger.exception("Couldn't queue inspiration tagging for workspace %s", workspace.id)
+
+
+@background(schedule=0)
+def send_comment_dm(log_id: str):
+    """Send one matched comment's private reply. Failures are recorded on the log row."""
+    from apps.growth.models import CommentDMLog
+    from apps.growth.services.comment_dm import send
+
+    log = CommentDMLog.objects.select_related("rule__social_account", "rule__workspace").filter(id=log_id).first()
+    if log is None:
+        return
+    try:
+        send(log)
+    except Exception:
+        logger.exception("Comment → DM send for log %s failed", log_id)

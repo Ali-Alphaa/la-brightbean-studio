@@ -1,16 +1,19 @@
 """``/api/v1/growth/*`` — growth insights for agents and automation tools (n8n, Make, …).
 
-Read-only apart from ``/utm``, which only transforms the text it is given.
-Every route requires ``view_analytics`` and respects the key's account
-allowlist, exactly like ``/api/v1/analytics``.
+Read-only apart from ``/utm``, which only transforms the text it is given, and
+``/inspiration/capture``, which the BrightBean browser extension uses to feed
+the Instagram/TikTok inspiration library and the user's voice. Every route
+except ``/inspiration/ping`` requires ``view_analytics``; account-specific
+routes respect the key's account allowlist, exactly like ``/api/v1/analytics``.
 """
 
 from __future__ import annotations
 
 import uuid
 from datetime import datetime
+from typing import Literal
 
-from ninja import Query, Router, Schema
+from ninja import Field, Query, Router, Schema
 
 from apps.api.limits import enforce_http_rate_limits
 from apps.api.middleware import log_audit_entry
@@ -198,3 +201,85 @@ def utm(request, payload: UtmIn):
         platform=payload.platform or "social",
     )
     return {"text": add_utm(payload.text[:20000], params)}
+
+
+# --- inspiration (browser extension) -------------------------------------------------------
+#
+# The request/response shape below is a contract shared with the Chrome
+# extension. Keep field names and types stable.
+
+
+class CaptureItemIn(Schema):
+    id: str = Field(..., min_length=1, max_length=255)
+    url: str = Field("", max_length=500)
+    authorHandle: str = Field("", max_length=255)  # noqa: N815 — extension contract
+    authorName: str = Field("", max_length=255)  # noqa: N815
+    text: str = Field("", max_length=10000)
+    # Every count is nullable: null means "the page didn't show it", never 0.
+    likes: int | None = Field(None, ge=0)
+    comments: int | None = Field(None, ge=0)
+    shares: int | None = Field(None, ge=0)
+    views: int | None = Field(None, ge=0)
+    saves: int | None = Field(None, ge=0)
+    mediaType: Literal["image", "video", "carousel"] | None = None  # noqa: N815
+    postedAt: str | None = Field(None, max_length=64)  # noqa: N815
+    own: bool = False
+    manual: bool = False
+
+
+class CaptureIn(Schema):
+    platform: Literal["instagram", "tiktok"]
+    ownHandle: str | None = Field(None, max_length=255)  # noqa: N815
+    utcOffset: int | None = Field(None, ge=-14 * 60, le=14 * 60)  # noqa: N815 — JS getTimezoneOffset(): minutes west of UTC
+    items: list[CaptureItemIn] = Field(..., max_length=100)
+
+
+class CaptureOut(Schema):
+    saved: int
+    manual: int
+    savedToday: int  # noqa: N815
+
+
+class PingOut(Schema):
+    ok: bool
+    workspace: str
+
+
+@router.get("/inspiration/ping", response=PingOut, summary="Check an extension's API key")
+def inspiration_ping(request):
+    """Used by the extension's "Test connection" button. Any valid key works."""
+    enforce_http_rate_limits(request, is_write=False)
+    return {"ok": True, "workspace": request.workspace.name}
+
+
+@router.post("/inspiration/capture", response=CaptureOut, summary="Capture Instagram/TikTok posts from the extension")
+def inspiration_capture(request, payload: CaptureIn):
+    """Feed the inspiration library and the user's voice.
+
+    * ``own`` items (or items by ``ownHandle``) go to the voice for
+      ``(platform, ownHandle)``, never to the library.
+    * ``manual`` items are saved as they are.
+    * Everything else updates its author's like baseline and is saved only
+      when it beats that author's usual likes (≥ 50 likes and ≥ 3× the median
+      of at least 3 other posts); a null ``likes`` is never judged or sampled.
+    """
+    from apps.growth.services import inspiration
+    from apps.growth.tasks import queue_tagging
+
+    enforce_http_rate_limits(request, is_write=True)
+    _require_perm(request, "view_analytics")
+    workspace = request.workspace
+    items = [
+        normalized
+        for normalized in (inspiration.normalize_item(payload.platform, item.model_dump()) for item in payload.items)
+        if normalized is not None
+    ]
+    result = inspiration.capture(workspace, payload.platform, items, own_handle=payload.ownHandle or "")
+    if result.new_ids:
+        queue_tagging(workspace)
+    log_audit_entry(request, action="growth.inspiration.capture", target_id=None, status_code=200)
+    return {
+        "saved": result.saved,
+        "manual": result.manual,
+        "savedToday": inspiration.saved_today(workspace, -payload.utcOffset if payload.utcOffset is not None else None),
+    }

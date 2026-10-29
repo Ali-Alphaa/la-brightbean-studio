@@ -650,6 +650,28 @@ If you set only the Path B (Company) credentials, Brightbean Studio automaticall
    PLATFORM_TIKTOK_CLIENT_SECRET=your-client-secret
    ```
 7. For production review, record the demo video against a TikTok **Sandbox** showing every requested scope in use.
+8. **Audit:** until TikTok approves your app's Content Posting API audit, `creator_info` offers only `SELF_ONLY`, so
+   every post publishes as *Only me* (private). Studio detects this and says so on TikTok posts, including Growth →
+   Inspiration → Repurpose. Apply for the audit in the developer portal (Content Posting API → audit) to post publicly.
+   `video.list` is requested only when TikTok analytics is enabled; Growth → Voices uses it to pull your own videos.
+
+### Growth: Claude, Inspiration, Voices and Comment → DM (Instagram + TikTok)
+
+- **AI:** set `ANTHROPIC_API_KEY` (optional `ANTHROPIC_MODEL`, default `claude-opus-5-5`). When it is set, Claude powers
+  every Growth AI feature; otherwise the OpenAI-compatible `GROWTH_AI_API_KEY` is used. Without either, AI buttons are
+  disabled and pages say so.
+- **Browser extension:** create an API key under *Organization → API Keys* for the workspace with the
+  **View analytics** permission (keys must allowlist at least one connected account; capture itself ignores the
+  allowlist). The extension sends `Authorization: Bearer bb_studio_…` to `{APP_URL}/api/v1/growth/inspiration/capture`.
+  Behind a TLS-terminating proxy, the proxy must send `X-Forwarded-Proto: https` (Caddy does by default; production
+  settings trust it via `SECURE_PROXY_SSL_HEADER`), or every API call gets a 401.
+- **Collect from @handle (Instagram Business Discovery):** uses a connected Instagram account via **Facebook Login**
+  (`instagram_basic`, `pages_read_engagement`). Only public business/creator accounts can be looked up.
+- **Save by link:** TikTok uses the public oEmbed endpoint. Instagram uses Graph `instagram_oembed` with your Meta app
+  token (needs the *oEmbed Read* feature); without a Meta app, paste the caption.
+- **Comment → DM:** private replies need `instagram_manage_comments` + `instagram_manage_messages` (Facebook Login) or
+  `instagram_business_manage_comments` + `instagram_business_manage_messages` (Instagram Login), plus the Instagram
+  `comments` webhook. Meta allows one private reply per comment, within 7 days.
 
 ### Google (YouTube, Google Business Profile)
 
@@ -827,6 +849,8 @@ Don't poll faster than the data changes. Studio syncs the inbox every 5 minutes 
 | `PATCH` | `/inbox/replies/{reply_id}` | Edit a draft reply | `use_inbox` |
 | `POST` | `/inbox/replies/{reply_id}/send` | Deliver a draft reply to the platform | `reply_from_inbox` |
 | `DELETE` | `/inbox/replies/{reply_id}` | Discard a draft reply | `use_inbox` |
+| `GET` | `/growth/inspiration/ping` | Check a key ("Test connection" in the browser extension); returns `{"ok": true, "workspace": "<name>"}` | — |
+| `POST` | `/growth/inspiration/capture` | Instagram/TikTok posts seen by the browser extension → inspiration library / your voice | `view_analytics` |
 | `POST` | `/mcp` | JSON-RPC 2.0 endpoint for MCP clients | — |
 
 Post creation, media uploads, and inbox reply creation accept `idempotency_key` (or `Idempotency-Key` header) for safe retries.

@@ -636,6 +636,28 @@ class InstagramProvider(SocialProvider):
         ).json()
         return ReplyResult(platform_message_id=require_message_id(data, platform=self.platform_name), extra=data)
 
+    def send_private_reply(self, access_token: str, comment_id: str, text: str) -> ReplyResult:
+        """DM the author of an Instagram comment (Meta "private replies").
+
+        Addressed by ``comment_id`` rather than a person, through the linked
+        Page's Send API with the Page token. Meta allows one private reply per
+        comment, within 7 days of it. Needs ``instagram_manage_messages`` (and
+        ``instagram_manage_comments`` to receive the comment webhook).
+        """
+        page_id = self.credentials.get("page_id")
+        if not page_id:
+            raise MessagingError(
+                "Reconnect Instagram to obtain its linked Page and Page token.", platform=self.platform_name
+            )
+        validate_instagram_text(text, platform=self.platform_name)
+        data = self._request(
+            "POST",
+            f"{BASE_URL}/{page_id}/messages",
+            access_token=access_token,
+            json={"recipient": {"comment_id": str(comment_id)}, "message": {"text": text}},
+        ).json()
+        return ReplyResult(platform_message_id=require_message_id(data, platform=self.platform_name), extra=data)
+
     def _fetch_media_comments(self, access_token: str, since: datetime | None = None) -> list[InboxMessage]:
         """Poll comments on the account's recent media.
 
