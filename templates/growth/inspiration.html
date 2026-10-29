@@ -1,0 +1,166 @@
+{% extends "growth/_layout.html" %}
+
+{% block growth_content %}
+{% include "growth/_ai_notice.html" %}
+
+<details class="g-card p-5 mb-5" {% if not total_count %}open{% endif %}>
+    <summary class="text-[15px] font-semibold text-stone-900 cursor-pointer">Set up: browser extension, API key and permissions</summary>
+    <div class="grid gap-4 md:grid-cols-2 mt-3 text-[13px] text-stone-700">
+        <div>
+            <h4 class="font-semibold text-stone-800 mb-1">1. Browser extension (auto-capture)</h4>
+            <ol class="list-decimal ml-5 space-y-1">
+                <li>Load the BrightBean extension in Chrome (<em>chrome://extensions</em> → Developer mode → Load unpacked).</li>
+                <li>Create an API key on <a class="underline" href="{{ api_keys_url }}">Organization → API Keys</a> for this workspace with the <strong>View analytics</strong> permission.</li>
+                <li>In the extension, paste the key and the server address <code>{{ api_base }}</code>, then press <em>Test connection</em>.</li>
+                <li>Browse Instagram or TikTok as usual. Posts with ≥ 50 likes and ≥ 3× their author's usual likes are saved here; your own posts go to your voice.</li>
+            </ol>
+        </div>
+        <div>
+            <h4 class="font-semibold text-stone-800 mb-1">2. Official APIs</h4>
+            <ul class="list-disc ml-5 space-y-1">
+                <li><strong>Collect from @handle</strong> uses Instagram Business Discovery through your connected Instagram account (Facebook Login): needs <code>instagram_basic</code> and <code>pages_read_engagement</code>.</li>
+                <li><strong>Comment → DM</strong> needs <code>instagram_manage_comments</code> and <code>instagram_manage_messages</code> (Instagram Login: <code>instagram_business_manage_comments</code>, <code>instagram_business_manage_messages</code>) and the Instagram comments webhook.</li>
+                <li><strong>TikTok</strong>: posts stay private (<em>Only me</em>) until your TikTok app passes TikTok's content-posting audit. Pulling your own TikTok videos needs the <code>video.list</code> scope.</li>
+            </ul>
+        </div>
+    </div>
+</details>
+
+<div class="grid gap-5 lg:grid-cols-3 mb-5">
+    <div class="g-card p-5">
+        <h3 class="text-[15px] font-semibold text-stone-900 mb-1">Save by link</h3>
+        <p class="g-help mb-3">An Instagram post/reel link or a TikTok video link.</p>
+        <form method="post" action="{% url 'growth:inspiration_add_link' workspace_id=workspace.id %}" class="space-y-2">
+            {% csrf_token %}
+            <input name="url" class="g-input" placeholder="https://www.instagram.com/p/… or https://www.tiktok.com/@…/video/…" required maxlength="500">
+            <textarea name="caption" class="g-input" rows="2" placeholder="Caption (needed for Instagram when no Meta app is configured)" maxlength="10000"></textarea>
+            <button class="g-btn" type="submit">Save</button>
+        </form>
+    </div>
+    <div class="g-card p-5">
+        <h3 class="text-[15px] font-semibold text-stone-900 mb-1">Collect from @handle <span class="g-pill">Instagram</span></h3>
+        <p class="g-help mb-3">Last 50 posts of a public business or creator account, ranked against its own median.</p>
+        {% if discovery_account %}
+        <form method="post" action="{% url 'growth:inspiration_discover' workspace_id=workspace.id %}" class="space-y-2">
+            {% csrf_token %}
+            <input name="handle" class="g-input" placeholder="@account" required maxlength="31">
+            <button class="g-btn" type="submit">Collect</button>
+        </form>
+        <p class="g-help mt-2">Runs through {{ discovery_account.account_name }}.</p>
+        {% else %}
+        <p class="text-sm text-stone-500">Connect an Instagram business account with Facebook Login to use this.</p>
+        {% endif %}
+    </div>
+    <div class="g-card p-5">
+        <h3 class="text-[15px] font-semibold text-stone-900 mb-1">AI tagging</h3>
+        <p class="g-help mb-3">Topics, hook type, format and whether a post fits your niche (trading &amp; markets). Runs automatically after each capture.</p>
+        <p class="text-sm text-stone-700 mb-2">{{ pending_count }} post{{ pending_count|pluralize }} waiting.</p>
+        <form method="post" action="{% url 'growth:inspiration_analyze' workspace_id=workspace.id %}">
+            {% csrf_token %}
+            <button class="g-btn-ghost" type="submit" {% if not ai_enabled or not pending_count %}disabled{% endif %}>Analyze pending</button>
+        </form>
+    </div>
+</div>
+
+<form method="get" class="g-card p-4 mb-4 flex flex-wrap items-end gap-3 text-[13px]">
+    <div><label class="g-label">Platform</label>
+        <select name="platform" class="g-input" style="width:auto">
+            <option value="">Both</option>
+            <option value="instagram" {% if f.platform == 'instagram' %}selected{% endif %}>Instagram</option>
+            <option value="tiktok" {% if f.platform == 'tiktok' %}selected{% endif %}>TikTok</option>
+        </select></div>
+    <div class="flex-1 min-w-[160px]"><label class="g-label">Search</label><input name="q" value="{{ f.q }}" class="g-input" placeholder="caption or @author"></div>
+    <div><label class="g-label">Topic</label>
+        <select name="topic" class="g-input" style="width:auto"><option value="">Any</option>{% for t in all_topics %}<option value="{{ t }}" {% if f.topic == t %}selected{% endif %}>{{ t }}</option>{% endfor %}</select></div>
+    <div><label class="g-label">Hook</label>
+        <select name="hook" class="g-input" style="width:auto"><option value="">Any</option>{% for h in hook_types %}<option value="{{ h }}" {% if f.hook == h %}selected{% endif %}>{{ h }}</option>{% endfor %}</select></div>
+    <div><label class="g-label">Format</label>
+        <select name="format" class="g-input" style="width:auto"><option value="">Any</option>{% for fm in formats %}<option value="{{ fm }}" {% if f.format == fm %}selected{% endif %}>{{ fm }}</option>{% endfor %}</select></div>
+    <div><label class="g-label">Niche</label>
+        <select name="niche" class="g-input" style="width:auto">
+            <option value="on" {% if f.niche == 'on' %}selected{% endif %}>On niche</option>
+            <option value="off" {% if f.niche == 'off' %}selected{% endif %}>Off niche</option>
+            <option value="all" {% if f.niche == 'all' %}selected{% endif %}>All</option>
+        </select></div>
+    <div><label class="g-label">Source</label>
+        <select name="source" class="g-input" style="width:auto"><option value="">Any</option>{% for value, label in sources %}<option value="{{ value }}" {% if f.source == value %}selected{% endif %}>{{ label }}</option>{% endfor %}</select></div>
+    <div><label class="g-label">Sort</label>
+        <select name="sort" class="g-input" style="width:auto">
+            <option value="ratio" {% if f.sort == 'ratio' %}selected{% endif %}>× usual</option>
+            <option value="likes" {% if f.sort == 'likes' %}selected{% endif %}>Likes</option>
+            <option value="recent" {% if f.sort == 'recent' %}selected{% endif %}>Recent</option>
+        </select></div>
+    <label class="g-help flex items-center gap-1"><input type="checkbox" name="hidden" value="1" {% if f.hidden %}checked{% endif %}> Hidden</label>
+    <button class="g-btn-ghost" type="submit">Filter</button>
+</form>
+
+<div x-data="{ selected: [] }">
+    <form id="repurpose-form" method="post" action="{% url 'growth:inspiration_repurpose' workspace_id=workspace.id %}"
+          class="g-card p-4 mb-4 flex flex-wrap items-center gap-3 text-[13px]" x-data="{ useVoice: false }">
+        {% csrf_token %}
+        <strong class="text-stone-800" x-text="selected.length + ' selected'">0 selected</strong>
+        <span class="g-help">(1–10)</span>
+        <label>Post to
+            <select name="platform" class="g-input" style="width:auto;display:inline-block">
+                <option value="instagram">Instagram</option>
+                <option value="tiktok">TikTok</option>
+            </select></label>
+        <label class="flex items-center gap-1"><input type="checkbox" name="use_voice" x-model="useVoice"> Use my voice</label>
+        <select name="voice" class="g-input" style="width:auto" x-show="useVoice">
+            {% for v in voices %}<option value="{{ v.id }}">{{ v.get_platform_display }} · @{{ v.handle }}</option>{% empty %}<option value="">No voices yet</option>{% endfor %}
+        </select>
+        <button class="g-btn" type="submit" :disabled="selected.length < 1 || selected.length > 10" {% if not ai_enabled %}disabled{% endif %}>Repurpose → 5 variations</button>
+    </form>
+
+    {% if posts %}
+    <div class="grid gap-3 md:grid-cols-2">
+        {% for p in posts %}
+        <div class="g-card p-4 flex flex-col gap-2">
+            <div class="flex items-center justify-between gap-2 g-help">
+                <label class="flex items-center gap-2">
+                    <input type="checkbox" name="selected" value="{{ p.id }}" form="repurpose-form" x-model="selected">
+                    <span class="font-semibold text-stone-700">{% if p.author_handle %}@{{ p.author_handle }}{% else %}{{ p.author_name|default:"Unknown" }}{% endif %}</span>
+                </label>
+                <span class="flex items-center gap-1">
+                    <span class="g-pill">{{ p.get_platform_display }}</span>
+                    {% if p.ratio %}<span class="g-pill good">{{ p.ratio|floatformat:1 }}× usual</span>{% endif %}
+                </span>
+            </div>
+            <div class="text-[13px] text-stone-800 g-clamp" style="-webkit-line-clamp:6">{{ p.caption }}</div>
+            <div class="flex flex-wrap items-center gap-1">
+                {% if p.likes is not None %}<span class="g-pill">♥ {{ p.likes }}</span>{% endif %}
+                {% if p.comments is not None %}<span class="g-pill">💬 {{ p.comments }}</span>{% endif %}
+                {% if p.views is not None %}<span class="g-pill">▶ {{ p.views }}</span>{% endif %}
+                {% if p.shares is not None %}<span class="g-pill">↗ {{ p.shares }}</span>{% endif %}
+                {% if p.saves is not None %}<span class="g-pill">🔖 {{ p.saves }}</span>{% endif %}
+                {% for t in p.topics %}<span class="g-pill">{{ t }}</span>{% endfor %}
+                {% if p.hook_type %}<span class="g-pill">hook: {{ p.hook_type }}</span>{% endif %}
+                {% if p.format %}<span class="g-pill">{{ p.format }}</span>{% endif %}
+                {% if p.on_niche is False %}<span class="g-pill bad">off niche</span>{% endif %}
+                <span class="g-pill">{{ p.get_source_display }}</span>
+            </div>
+            <div class="flex flex-wrap items-center gap-2 mt-auto">
+                {% if p.url %}<a class="g-help hover:underline" href="{{ p.url }}" target="_blank" rel="noopener noreferrer">Open ↗</a>{% endif %}
+                <form method="post" action="{% url 'growth:inspiration_hide' workspace_id=workspace.id post_id=p.id %}" class="inline">
+                    {% csrf_token %}<input type="hidden" name="next" value="{{ request.get_full_path }}">
+                    <button class="g-btn-ghost" type="submit">{% if p.hidden %}Unhide{% else %}Hide{% endif %}</button>
+                </form>
+                {% if ai_enabled %}
+                <form method="post" action="{% url 'growth:inspiration_rewrite' workspace_id=workspace.id post_id=p.id %}" class="ml-auto flex items-center gap-1">
+                    {% csrf_token %}
+                    <input type="hidden" name="use_voice" value="on">
+                    <select name="voice" class="g-input" style="width:auto;padding:4px 8px;font-size:12px">
+                        {% for v in voices %}<option value="{{ v.id }}">@{{ v.handle }}</option>{% empty %}<option value="">no voice</option>{% endfor %}
+                    </select>
+                    <button class="g-btn-ghost" type="submit">Rewrite in my voice</button>
+                </form>
+                {% endif %}
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+    {% else %}
+    <div class="g-card p-6 text-sm text-stone-600">Nothing here yet. Install the extension and browse, save a post by link, or collect from an Instagram account.</div>
+    {% endif %}
+</div>
+{% endblock %}

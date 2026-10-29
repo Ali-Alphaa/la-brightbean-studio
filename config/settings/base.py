@@ -344,6 +344,11 @@ UNSPLASH_ACCESS_KEY = env("UNSPLASH_ACCESS_KEY", default="")
 GROWTH_AI_API_KEY = env("GROWTH_AI_API_KEY", default="") or env("OPENAI_API_KEY", default="")
 GROWTH_AI_BASE_URL = env("GROWTH_AI_BASE_URL", default="https://api.openai.com/v1")
 GROWTH_AI_MODEL = env("GROWTH_AI_MODEL", default="gpt-4o-mini")
+# Claude (Anthropic) takes precedence over the OpenAI-compatible endpoint above
+# when ANTHROPIC_API_KEY is set. Powers the same features plus the Inspiration
+# library's tagging, the 5-variation repurpose and per-account voice guides.
+ANTHROPIC_API_KEY = env("ANTHROPIC_API_KEY", default="")
+ANTHROPIC_MODEL = env("ANTHROPIC_MODEL", default="") or "claude-opus-5-5"
 
 SOCIALACCOUNT_PROVIDERS = {
     "google": {

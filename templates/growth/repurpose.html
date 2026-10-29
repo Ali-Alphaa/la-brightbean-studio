@@ -1,0 +1,62 @@
+{% extends "growth/_layout.html" %}
+
+{% block growth_content %}
+<div class="flex flex-wrap items-baseline justify-between gap-2 mb-4">
+    <div>
+        <h3 class="text-[15px] font-semibold text-stone-900">{{ cards|length }} {{ run.get_target_platform_display }} variation{{ cards|length|pluralize }}</h3>
+        <p class="g-help">From {{ sources|length }} source post{{ sources|length|pluralize }}{% if run.voice %}, in the voice of @{{ run.voice.handle }}{% endif %}. Edit freely, then pick one. You'll attach the image or video in the composer — {{ run.get_target_platform_display }} needs media.</p>
+    </div>
+    <a class="g-btn-ghost" href="{% url 'growth:inspiration' workspace_id=workspace.id %}">Back to library</a>
+</div>
+
+{% if run.target_platform == 'tiktok' %}
+<div class="g-card-muted p-4 mb-4 text-[13px] text-stone-700">
+    <strong>TikTok posts are private until your TikTok app passes TikTok's audit.</strong>
+    {% if privacy %}
+        {% if privacy.options is None %}
+            Couldn't ask TikTok which privacy levels this account allows right now.
+        {% elif privacy.self_only %}
+            TikTok currently allows only <code>SELF_ONLY</code> for {{ default_account.account_name }}, so this post will publish as <em>Only me</em>.
+        {% else %}
+            Allowed privacy levels for {{ default_account.account_name }}: {% for o in privacy.options %}<code>{{ o }}</code>{% if not forloop.last %}, {% endif %}{% endfor %}.
+        {% endif %}
+    {% endif %}
+</div>
+{% endif %}
+
+{% if not accounts %}
+<div class="g-card p-5 mb-4 text-sm text-stone-600">Connect a {{ run.get_target_platform_display }} account to turn a variation into a post.</div>
+{% endif %}
+
+<div class="grid gap-4 md:grid-cols-2">
+    {% for card in cards %}
+    <form method="post" action="{% url 'growth:repurpose_choose' workspace_id=workspace.id run_id=run.id %}" class="g-card p-4 flex flex-col gap-2"
+          data-caption="{{ card.caption }}" x-data="{ text: $el.dataset.caption }">
+        {% csrf_token %}
+        <input type="hidden" name="index" value="{{ card.index }}">
+        <div class="flex items-center justify-between">
+            <span class="g-pill">#{{ forloop.counter }}{% if run.chosen_index == card.index %} · chosen{% endif %}</span>
+            <span class="g-help" :class="text.length > {{ limit }} ? 'text-red-600' : ''"><span x-text="text.length">{{ card.caption|length }}</span> / {{ limit }}</span>
+        </div>
+        {% if card.variation.hook %}<div class="text-[13px] font-semibold text-stone-800">Hook: {{ card.variation.hook }}</div>{% endif %}
+        <textarea name="caption" class="g-input" rows="8" maxlength="5000" x-model="text">{{ card.caption }}</textarea>
+        {% if card.variation.script %}
+        <div class="text-[13px] text-stone-700">
+            <div class="g-label">Video script (15–45 s)</div>
+            <ol class="list-decimal ml-5 space-y-0.5">{% for beat in card.variation.script %}<li>{{ beat }}</li>{% endfor %}</ol>
+            <p class="g-help">Saved to the post's internal notes.</p>
+        </div>
+        {% endif %}
+        {% if accounts %}
+        <div class="flex flex-wrap items-center gap-2 mt-auto">
+            <select name="account" class="g-input" style="width:auto">
+                {% for a in accounts %}<option value="{{ a.id }}" {% if default_account and a.id == default_account.id %}selected{% endif %}>{{ a.account_name }}</option>{% endfor %}
+            </select>
+            <button class="g-btn" type="submit" name="action" value="compose">Open in composer</button>
+            <button class="g-btn-ghost" type="submit" name="action" value="schedule" title="Draft with the next free posting slot proposed">Draft for next slot</button>
+        </div>
+        {% endif %}
+    </form>
+    {% endfor %}
+</div>
+{% endblock %}

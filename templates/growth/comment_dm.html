@@ -1,0 +1,105 @@
+{% extends "growth/_layout.html" %}
+
+{% block growth_content %}
+<div class="g-card-muted p-4 mb-5 text-[13px] text-stone-700">
+    When someone comments a keyword on your Instagram post, they get a <strong>private reply</strong> (a DM) with your link, an optional public reply, and a tag in <a class="underline" href="{% url 'growth:audience' workspace_id=workspace.id %}">Top engagers</a>.
+    Needs the Instagram comments webhook and <code>instagram_manage_comments</code> + <code>instagram_manage_messages</code>
+    (Instagram Login: <code>instagram_business_manage_comments</code> + <code>instagram_business_manage_messages</code>).
+    Meta allows one private reply per comment, within 7 days of it. Each comment is answered at most once.
+</div>
+
+{% if simulation %}
+<div class="g-card p-4 mb-5 text-[13px]">
+    <h3 class="text-[15px] font-semibold text-stone-900 mb-1">Test result (nothing was sent)</h3>
+    <p class="text-stone-600 mb-2">Comment: “{{ simulation.text }}”</p>
+    {% if simulation.matched %}
+    <p>Matched rule <strong>{{ simulation.rule }}</strong> on keyword <span class="g-pill good">{{ simulation.keyword }}</span>.</p>
+    <p class="mt-1"><span class="g-label" style="display:inline">DM:</span> {{ simulation.dm }}</p>
+    {% if simulation.public_reply %}<p class="mt-1"><span class="g-label" style="display:inline">Public reply:</span> {{ simulation.public_reply }}</p>{% endif %}
+    {% if simulation.tag %}<p class="mt-1"><span class="g-label" style="display:inline">Tag:</span> {{ simulation.tag }}</p>{% endif %}
+    {% if simulation.note %}<p class="mt-1 text-amber-700">A real comment would be skipped: {{ simulation.note }}</p>{% endif %}
+    {% else %}
+    <p>No enabled rule matched.</p>
+    {% endif %}
+</div>
+{% endif %}
+
+<div class="grid gap-5 lg:grid-cols-3 mb-5">
+    <div class="g-card p-5">
+        <h3 class="text-[15px] font-semibold text-stone-900 mb-3">New rule</h3>
+        {% if accounts %}
+        <form method="post" class="space-y-3">
+            {% csrf_token %}
+            <div><label class="g-label">Instagram account</label>
+                <select name="account" class="g-input">{% for a in accounts %}<option value="{{ a.id }}">{{ a.account_name }}</option>{% endfor %}</select></div>
+            <div><label class="g-label">Post (media id)</label><input name="media_id" class="g-input" placeholder="Empty = all posts" maxlength="255"></div>
+            <div><label class="g-label">Name</label><input name="name" class="g-input" maxlength="200" placeholder="Free guide"></div>
+            <div><label class="g-label">Keywords</label><input name="keywords" class="g-input" required placeholder="guide, link, send" maxlength="1000"><p class="g-help">Comma-separated; whole words, any case.</p></div>
+            <div><label class="g-label">DM text (with your link)</label><textarea name="dm_text" class="g-input" rows="3" required maxlength="1000"></textarea></div>
+            <div><label class="g-label">Public reply (optional)</label><input name="public_reply_text" class="g-input" maxlength="2000" placeholder="Sent you a DM 📩"></div>
+            <div><label class="g-label">Tag commenter as (optional)</label><input name="tag" class="g-input" maxlength="50" placeholder="lead"></div>
+            <div class="flex items-center gap-4">
+                <label class="g-help flex items-center gap-1"><input type="checkbox" name="once_per_user" checked> Once per person</label>
+                <label class="g-help">Daily cap <input name="daily_cap" type="number" min="1" max="1000" value="200" class="g-input" style="width:90px;display:inline-block"></label>
+            </div>
+            <button class="g-btn" type="submit">Save rule</button>
+        </form>
+        {% else %}
+        <p class="text-sm text-stone-500">Connect an Instagram business account first.</p>
+        {% endif %}
+    </div>
+    <div class="g-card p-5 lg:col-span-2">
+        <h3 class="text-[15px] font-semibold text-stone-900 mb-3">Rules</h3>
+        {% for rule in rules %}
+        <div class="border-t border-stone-100 py-3 text-[13px]">
+            <div class="flex flex-wrap items-center justify-between gap-2">
+                <div>
+                    <strong class="text-stone-800">{{ rule.name|default:"Rule" }}</strong>
+                    <span class="g-pill {% if rule.enabled %}good{% endif %}">{% if rule.enabled %}On{% else %}Off{% endif %}</span>
+                    <span class="g-help">{{ rule.social_account.account_name }} · {% if rule.media_id %}post {{ rule.media_id }}{% else %}all posts{% endif %} · cap {{ rule.daily_cap }}/day{% if rule.once_per_user %} · once per person{% endif %}</span>
+                </div>
+                <div class="flex gap-1">
+                    <form method="post" action="{% url 'growth:comment_dm_toggle' workspace_id=workspace.id rule_id=rule.id %}">{% csrf_token %}<button class="g-btn-ghost" type="submit">{% if rule.enabled %}Turn off{% else %}Turn on{% endif %}</button></form>
+                    <form method="post" action="{% url 'growth:comment_dm_toggle' workspace_id=workspace.id rule_id=rule.id %}">{% csrf_token %}<button class="g-btn-ghost" type="submit" name="action" value="delete">Delete</button></form>
+                </div>
+            </div>
+            <div class="mt-1">{% for k in rule.keywords %}<span class="g-pill">{{ k }}</span> {% endfor %}{% if rule.tag %}<span class="g-pill">tag: {{ rule.tag }}</span>{% endif %}</div>
+            <div class="g-help mt-1">DM: {{ rule.dm_text|truncatechars:140 }}</div>
+            <form method="post" action="{% url 'growth:comment_dm_simulate' workspace_id=workspace.id rule_id=rule.id %}" class="flex gap-2 mt-2">
+                {% csrf_token %}
+                <input name="text" class="g-input" placeholder="Simulate a comment, e.g. “send me the guide”" required maxlength="2000">
+                <input name="handle" class="g-input" style="width:140px" placeholder="@tester" maxlength="50">
+                <button class="g-btn-ghost" type="submit">Test</button>
+            </form>
+        </div>
+        {% empty %}
+        <p class="text-sm text-stone-500">No rules yet.</p>
+        {% endfor %}
+    </div>
+</div>
+
+<div class="g-card p-5">
+    <h3 class="text-[15px] font-semibold text-stone-900 mb-3">Recent activity</h3>
+    {% if logs %}
+    <div class="overflow-x-auto">
+    <table class="g-table">
+        <thead><tr><th>When</th><th>Commenter</th><th>Comment</th><th>Keyword</th><th>Status</th><th>Note</th></tr></thead>
+        <tbody>
+        {% for log in logs %}
+        <tr>
+            <td class="whitespace-nowrap">{{ log.created_at|date:"M j H:i" }}</td>
+            <td>{{ log.commenter_handle|default:log.commenter_id }}</td>
+            <td><div class="g-clamp">{{ log.comment_text }}</div></td>
+            <td><span class="g-pill">{{ log.keyword }}</span></td>
+            <td><span class="g-pill {% if log.status == 'sent' %}good{% elif log.status == 'failed' %}bad{% endif %}">{{ log.get_status_display }}</span></td>
+            <td class="g-help">{{ log.error }}</td>
+        </tr>
+        {% endfor %}
+        </tbody>
+    </table>
+    </div>
+    {% else %}
+    <p class="text-sm text-stone-500">Nothing yet.</p>
+    {% endif %}
+</div>
+{% endblock %}

@@ -269,6 +269,8 @@ def _action_for_path(method: str, path: str, *, status_code: int) -> str:
                 return f"inbox.reply.discard.{status_code}"
         if method == "GET":
             return f"inbox.read.{status_code}"
+    if "/growth/" in path:
+        return f"growth.{method.lower()}.{status_code}"
     if "/mcp" in path:
         return f"mcp.error.{status_code}"
     if "/accounts" in path:

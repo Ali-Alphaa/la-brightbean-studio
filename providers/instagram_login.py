@@ -651,6 +651,22 @@ class InstagramLoginProvider(SocialProvider):
         data = resp.json()
         return ReplyResult(platform_message_id=require_message_id(data, platform=self.platform_name), extra=data)
 
+    def send_private_reply(self, access_token: str, comment_id: str, text: str) -> ReplyResult:
+        """DM the author of a comment (Meta "private replies"), addressed by ``comment_id``.
+
+        ``POST /{ig-user-id}/messages`` with ``recipient.comment_id``. One per
+        comment, within 7 days of it; needs ``instagram_business_manage_messages``.
+        """
+        ig_user_id = str(self.credentials.get("ig_user_id") or "me")
+        validate_instagram_text(text, platform=self.platform_name)
+        data = self._request(
+            "POST",
+            f"{API_BASE}/{ig_user_id}/messages",
+            access_token=access_token,
+            json={"recipient": {"comment_id": str(comment_id)}, "message": {"text": text}},
+        ).json()
+        return ReplyResult(platform_message_id=require_message_id(data, platform=self.platform_name), extra=data)
+
     def reply_to_comment(self, access_token: str, comment_id: str, text: str, extra: dict | None = None) -> ReplyResult:
         """Reply to a comment, or comment on a media item.
 

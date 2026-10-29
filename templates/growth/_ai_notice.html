@@ -1,0 +1,8 @@
+{% if not ai_enabled %}
+<div class="g-card-muted p-4 mb-5 text-[13px] text-stone-700">
+    <strong>AI not configured.</strong> Tagging, repurposing, rewrites and style guides need an AI key.
+    Set <code>ANTHROPIC_API_KEY</code> (Claude, recommended; optional <code>ANTHROPIC_MODEL</code>, default <code>claude-opus-5-5</code>)
+    or <code>GROWTH_AI_API_KEY</code> (any OpenAI-compatible endpoint) in the server's environment and restart the app.
+    Saving, filtering and Comment → DM work without it.
+</div>
+{% endif %}

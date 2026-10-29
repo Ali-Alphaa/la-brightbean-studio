@@ -352,6 +352,7 @@ def _upsert_instagram_comment(account, value: dict):
     if _is_own_activity(account, from_data):
         return
 
+    extra = _instagram_comment_extra(value, reply_edge="comment")
     _create_if_new(
         account=account,
         platform_message_id=str(comment_id),
@@ -359,8 +360,26 @@ def _upsert_instagram_comment(account, value: dict):
         sender_name=from_data.get("username", "Unknown"),
         sender_id=from_data.get("id", ""),
         body=value.get("text", ""),
-        extra=_instagram_comment_extra(value, reply_edge="comment"),
+        extra=extra,
     )
+    _run_comment_dm_rules(
+        account,
+        comment_id=str(comment_id),
+        text=value.get("text", ""),
+        commenter_id=str(from_data.get("id") or ""),
+        commenter_handle=str(from_data.get("username") or ""),
+        media_id=str(extra.get("post_id") or ""),
+    )
+
+
+def _run_comment_dm_rules(account, **comment):
+    """Growth → Comment → DM: match keyword rules. Must never break webhook handling."""
+    try:
+        from apps.growth.services.comment_dm import handle_instagram_comment
+
+        handle_instagram_comment(account, **comment)
+    except Exception:
+        logger.exception("Comment → DM rules failed for account %s", account.id)
 
 
 # Instagram's mention payload carries only IDs, never the text, so the inbox

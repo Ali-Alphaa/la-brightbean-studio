@@ -1,0 +1,61 @@
+{% extends "growth/_layout.html" %}
+
+{% block growth_content %}
+{% include "growth/_ai_notice.html" %}
+
+{% if voices %}
+<div class="flex flex-wrap gap-2 mb-5">
+    {% for v in voices %}
+    <a href="?voice={{ v.id }}" class="g-pill {% if selected and v.id == selected.id %}good{% endif %}" style="padding:6px 12px">
+        {{ v.get_platform_display }} · @{{ v.handle }} <span class="g-help">({{ v.samples|length }})</span>
+    </a>
+    {% endfor %}
+</div>
+{% endif %}
+
+{% if selected %}
+<div class="grid gap-5 lg:grid-cols-3">
+    <div class="g-card p-5 lg:col-span-2">
+        <div class="flex flex-wrap items-baseline justify-between gap-2 mb-2">
+            <h3 class="text-[15px] font-semibold text-stone-900">Style guide for @{{ selected.handle }}</h3>
+            <span class="g-help">{% if selected.style_guide_generated_at %}Generated {{ selected.style_guide_generated_at|timesince }} ago{% else %}Not generated yet{% endif %}</span>
+        </div>
+        <form method="post" action="{% url 'growth:voice_save' workspace_id=workspace.id voice_id=selected.id %}" class="space-y-2">
+            {% csrf_token %}
+            <textarea name="style_guide" class="g-input" rows="16" maxlength="10000" placeholder="Generate it from your best posts, or write it yourself.">{{ selected.style_guide }}</textarea>
+            <div class="flex flex-wrap gap-2">
+                <button class="g-btn" type="submit">Save</button>
+            </div>
+        </form>
+        <form method="post" action="{% url 'growth:voice_regenerate' workspace_id=workspace.id voice_id=selected.id %}" class="mt-2">
+            {% csrf_token %}
+            <button class="g-btn-ghost" type="submit" {% if not ai_enabled or not selected.samples %}disabled{% endif %}>Regenerate from my best posts</button>
+            <span class="g-help">Replaces the text above.</span>
+        </form>
+    </div>
+    <div class="g-card p-5">
+        <h3 class="text-[15px] font-semibold text-stone-900 mb-1">Your posts</h3>
+        <p class="g-help mb-3">{{ selected.samples|length }} sample{{ selected.samples|length|pluralize }}. Added by the extension when you open your own profile, or pulled here.</p>
+        {% if selected.social_account %}
+        <form method="post" action="{% url 'growth:voice_pull' workspace_id=workspace.id voice_id=selected.id %}" class="mb-3">
+            {% csrf_token %}
+            <button class="g-btn-ghost" type="submit">Pull my recent posts</button>
+        </form>
+        {% if selected.platform == 'tiktok' %}<p class="g-help mb-3">TikTok needs the <code>video.list</code> scope (on when TikTok analytics is enabled). Otherwise use the extension.</p>{% endif %}
+        {% else %}
+        <p class="g-help mb-3">Not linked to a connected account; the extension keeps it up to date.</p>
+        {% endif %}
+        <h4 class="g-label">Best performers</h4>
+        <ul class="space-y-2">
+            {% for s in best %}
+            <li class="text-[12px] text-stone-700 border-t border-stone-100 pt-2"><div class="g-clamp">{{ s.text }}</div><span class="g-help">♥ {{ s.likes|default_if_none:"—" }} · 💬 {{ s.comments|default_if_none:"—" }}</span></li>
+            {% empty %}
+            <li class="text-sm text-stone-500">No posts yet.</li>
+            {% endfor %}
+        </ul>
+    </div>
+</div>
+{% else %}
+<div class="g-card p-6 text-sm text-stone-600">Connect an Instagram or TikTok account, or open your own profile with the browser extension, to start a voice.</div>
+{% endif %}
+{% endblock %}

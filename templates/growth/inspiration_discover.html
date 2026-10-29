@@ -1,0 +1,38 @@
+{% extends "growth/_layout.html" %}
+
+{% block growth_content %}
+<div class="g-card p-5 mb-4">
+    <h3 class="text-[15px] font-semibold text-stone-900">@{{ profile.username }}{% if profile.name %} · {{ profile.name }}{% endif %}</h3>
+    <p class="g-help">{% if profile.followers is not None %}{{ profile.followers }} followers · {% endif %}{{ items|length }} recent posts, ranked by likes vs. this account's median. Pick the ones to keep.</p>
+</div>
+{% if items %}
+<form method="post" action="{% url 'growth:inspiration_discover_save' workspace_id=workspace.id %}" x-data>
+    {% csrf_token %}
+    <input type="hidden" name="token" value="{{ token }}">
+    <div class="flex gap-2 mb-3">
+        <button class="g-btn" type="submit">Save selected</button>
+        <button class="g-btn-ghost" type="button" @click="$root.querySelectorAll('input[name=selected]').forEach(c => c.checked = true)">Select all</button>
+        <a class="g-btn-ghost" href="{% url 'growth:inspiration' workspace_id=workspace.id %}">Cancel</a>
+    </div>
+    <div class="overflow-x-auto g-card">
+    <table class="g-table">
+        <thead><tr><th></th><th>Caption</th><th class="g-num">Likes</th><th class="g-num">Comments</th><th class="g-num">× usual</th><th>Posted</th></tr></thead>
+        <tbody>
+        {% for i in items %}
+        <tr>
+            <td><input type="checkbox" name="selected" value="{{ i.external_id }}" {% if i.ratio and i.ratio >= 3 %}checked{% endif %}></td>
+            <td><div class="g-clamp">{{ i.caption }}</div>{% if i.external_id in known %}<span class="g-pill">already saved</span>{% endif %} {% if i.url %}<a class="g-help hover:underline" href="{{ i.url }}" target="_blank" rel="noopener noreferrer">Open ↗</a>{% endif %}</td>
+            <td class="g-num">{{ i.likes|default_if_none:"—" }}</td>
+            <td class="g-num">{{ i.comments|default_if_none:"—" }}</td>
+            <td class="g-num">{% if i.ratio %}<span class="g-pill {% if i.ratio >= 3 %}good{% endif %}">{{ i.ratio|floatformat:1 }}×</span>{% else %}—{% endif %}</td>
+            <td class="whitespace-nowrap">{{ i.posted_at|date:"M j, Y" }}</td>
+        </tr>
+        {% endfor %}
+        </tbody>
+    </table>
+    </div>
+</form>
+{% else %}
+<div class="g-card p-6 text-sm text-stone-600">That account has no posts Instagram can share.</div>
+{% endif %}
+{% endblock %}
